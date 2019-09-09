@@ -10,7 +10,9 @@ import (
 const (
 	// ControlTypePaging - https://www.ietf.org/rfc/rfc2696.txt
 	ControlTypePaging = "1.2.840.113556.1.4.319"
-	// ControlPostRead - https://tools.ietf.org/html/rfc4527
+	// ControlTypePreRead - https://tools.ietf.org/html/rfc4527
+	ControlTypePreRead = "1.3.6.1.1.13.1"
+	// ControlTypePostRead - https://tools.ietf.org/html/rfc4527
 	ControlTypePostRead = "1.3.6.1.1.13.2"
 	// ControlTypeBeheraPasswordPolicy - https://tools.ietf.org/html/draft-behera-ldap-password-policy-10
 	ControlTypeBeheraPasswordPolicy = "1.3.6.1.4.1.42.2.27.8.5.1"
@@ -30,6 +32,7 @@ const (
 // ControlTypeMap maps controls to text descriptions
 var ControlTypeMap = map[string]string{
 	ControlTypePaging:                "Paging",
+	ControlTypePreRead:               "Pre-Read",
 	ControlTypePostRead:              "Post-Read",
 	ControlTypeBeheraPasswordPolicy:  "Password Policy - Behera Draft",
 	ControlTypeManageDsaIT:           "Manage DSA IT",
@@ -124,7 +127,46 @@ func (c *ControlPaging) SetCookie(cookie []byte) {
 	c.Cookie = cookie
 }
 
-// ControlPostRead implements the pre-read control described at https://tools.ietf.org/html/rfc4527
+// ControlPreRead implements the pre-read control described at https://tools.ietf.org/html/rfc4527
+type ControlPreRead struct {
+	Attributes  []string
+	Criticality bool
+	Entry       Entry
+}
+
+// GetControlType returns the OID
+func (c *ControlPreRead) GetControlType() string {
+	return ControlTypePreRead
+}
+
+// Encode returns the ber packet representation
+func (c *ControlPreRead) Encode() *ber.Packet {
+	packet := ber.Encode(ber.ClassUniversal, ber.TypeConstructed, ber.TagSequence, nil, "Control")
+	packet.AppendChild(ber.NewString(ber.ClassUniversal, ber.TypePrimitive, ber.TagOctetString, c.GetControlType(), "Control Type ("+ControlTypeMap[c.GetControlType()]+")"))
+	if c.Criticality {
+		packet.AppendChild(ber.NewBoolean(ber.ClassUniversal, ber.TypePrimitive, ber.TagBoolean, c.Criticality, "Criticality"))
+	}
+
+	if len(c.Attributes) > 0 {
+		p2 := ber.Encode(ber.ClassUniversal, ber.TypePrimitive, ber.TagOctetString, nil, "Control Value ("+ControlTypeMap[c.GetControlType()]+")")
+		seq := ber.Encode(ber.ClassUniversal, ber.TypeConstructed, ber.TagSequence, nil, "AttributeSelection Value")
+		for _, a := range c.Attributes {
+			seq.AppendChild(ber.NewString(ber.ClassUniversal, ber.TypePrimitive, ber.TagOctetString, a, "AttributeSelection"))
+		}
+		p2.AppendChild(seq)
+		packet.AppendChild(p2)
+	}
+
+	return packet
+}
+
+// String returns a human-readable description
+func (c *ControlPreRead) String() string {
+	// TODO: this need to be finished
+	return "Pre-Read Control"
+}
+
+// ControlPostRead implements the post-read control described at https://tools.ietf.org/html/rfc4527
 type ControlPostRead struct {
 	Attributes  []string
 	Criticality bool
@@ -133,19 +175,19 @@ type ControlPostRead struct {
 
 // GetControlType returns the OID
 func (c *ControlPostRead) GetControlType() string {
-	return "1.3.6.1.1.13.2"
+	return ControlTypePostRead
 }
 
 // Encode returns the ber packet representation
 func (c *ControlPostRead) Encode() *ber.Packet {
 	packet := ber.Encode(ber.ClassUniversal, ber.TypeConstructed, ber.TagSequence, nil, "Control")
-	packet.AppendChild(ber.NewString(ber.ClassUniversal, ber.TypePrimitive, ber.TagOctetString, c.GetControlType(), "Control Type (Post-Read)"))
+	packet.AppendChild(ber.NewString(ber.ClassUniversal, ber.TypePrimitive, ber.TagOctetString, c.GetControlType(), "Control Type ("+ControlTypeMap[c.GetControlType()]+")"))
 	if c.Criticality {
 		packet.AppendChild(ber.NewBoolean(ber.ClassUniversal, ber.TypePrimitive, ber.TagBoolean, c.Criticality, "Criticality"))
 	}
 
 	if len(c.Attributes) > 0 {
-		p2 := ber.Encode(ber.ClassUniversal, ber.TypePrimitive, ber.TagOctetString, nil, "Control Value (Paging)")
+		p2 := ber.Encode(ber.ClassUniversal, ber.TypePrimitive, ber.TagOctetString, nil, "Control Value ("+ControlTypeMap[c.GetControlType()]+")")
 		seq := ber.Encode(ber.ClassUniversal, ber.TypeConstructed, ber.TagSequence, nil, "AttributeSelection Value")
 		for _, a := range c.Attributes {
 			seq.AppendChild(ber.NewString(ber.ClassUniversal, ber.TypePrimitive, ber.TagOctetString, a, "AttributeSelection"))
@@ -159,6 +201,7 @@ func (c *ControlPostRead) Encode() *ber.Packet {
 
 // String returns a human-readable description
 func (c *ControlPostRead) String() string {
+	// TODO: this need to be finished
 	return "Post-Read Control"
 }
 
