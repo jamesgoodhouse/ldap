@@ -162,8 +162,13 @@ func (c *ControlPreRead) Encode() *ber.Packet {
 
 // String returns a human-readable description
 func (c *ControlPreRead) String() string {
-	// TODO: this need to be finished
-	return "Pre-Read Control"
+	return fmt.Sprintf(
+		"Control Type: %s (%q)  Criticality: %t",
+		ControlTypeMap[ControlTypePreRead],
+		ControlTypePreRead,
+		c.Criticality,
+		// TODO: pretty-print ldap.Entry
+	)
 }
 
 // ControlPostRead implements the post-read control described at https://tools.ietf.org/html/rfc4527
@@ -201,8 +206,13 @@ func (c *ControlPostRead) Encode() *ber.Packet {
 
 // String returns a human-readable description
 func (c *ControlPostRead) String() string {
-	// TODO: this need to be finished
-	return "Post-Read Control"
+	return fmt.Sprintf(
+		"Control Type: %s (%q)  Criticality: %t",
+		ControlTypeMap[ControlTypePreRead],
+		ControlTypePreRead,
+		c.Criticality,
+		// TODO: pretty-print ldap.Entry
+	)
 }
 
 // ControlBeheraPasswordPolicy implements the control described in https://tools.ietf.org/html/draft-behera-ldap-password-policy-10
@@ -469,7 +479,36 @@ func DecodeControl(packet *ber.Packet) (Control, error) {
 		c.Cookie = value.Children[1].Data.Bytes()
 		value.Children[1].Value = c.Cookie
 		return c, nil
+	case ControlTypePreRead:
+		// TODO: Dry things up between this case and the `ControlTypePostRead` case
+		value.Description += " (Pre-Read)"
+		c := new(ControlPreRead)
+		if value.Value != nil {
+			valueChildren, err := ber.DecodePacketErr(value.Data.Bytes())
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode data bytes: %s", err)
+			}
+			value.Data.Truncate(0)
+			value.Value = nil
+			value.AppendChild(valueChildren)
+		}
+		value = value.Children[0]
+		c.Criticality = Criticality
+		c.Entry = Entry{
+			DN: value.Children[0].Value.(string),
+		}
+		for _, v := range value.Children[1].Children {
+			attrName := v.Children[0].Value.(string)
+			attrVals := []string{}
+			for _, v2 := range v.Children[1].Children {
+				attrVals = append(attrVals, v2.Value.(string))
+			}
+			ea := NewEntryAttribute(attrName, attrVals)
+			c.Entry.Attributes = append(c.Entry.Attributes, ea)
+		}
+		return c, nil
 	case ControlTypePostRead:
+		// TODO: Dry things up between this case and the `ControlTypePreRead` case
 		value.Description += " (Post-Read)"
 		c := new(ControlPostRead)
 		if value.Value != nil {
